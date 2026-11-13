@@ -32,7 +32,7 @@
 
 ## 6. Deploy
 
-- [ ] 6.1 `git init -b main`, stage the site files, styleguide, README, `.nojekyll`, `.gitignore` and `openspec/`, and commit; verify that `git ls-files` excludes `.claude/` and `.agents/`
-- [ ] 6.2 `gh repo create neeshthecoder.github.io --public --source . --remote origin --push`; verify that `gh repo view neeshthecoder/neeshthecoder.github.io --json visibility` reports PUBLIC and that `main` is pushed
-- [ ] 6.3 Enable Pages from `main` `/` via `gh api` (treat 409 as already enabled); verify that `gh api repos/neeshthecoder/neeshthecoder.github.io/pages` shows source `main` and path `/`
-- [ ] 6.4 Poll `pages/builds/latest` until it is `built`; verify that `curl -sI` returns 200 for `https://neeshthecoder.github.io/`, `/gym-routine/` and `/library/`, and that the live page body contains "Avaneesh"; report the live URL
+- [x] 6.1 `git init -b main`, stage the site files, styleguide, README, `.nojekyll`, `.gitignore` and `openspec/`, and commit; verify that `git ls-files` excludes `.claude/` and `.agents/`
+- [x] 6.2 `gh repo create neeshthecoder.github.io --public --source . --remote origin --push`; verify that `gh repo view neeshthecoder/neeshthecoder.github.io --json visibility` reports PUBLIC and that `main` is pushed
+- [x] 6.3 Enable Pages from `main` `/` via `gh api` (treat 409 as already enabled); verify that `gh api repos/neeshthecoder/neeshthecoder.github.io/pages` shows source `main` and path `/`
+- [x] 6.4 Poll `pages/builds/latest` until it is `built`; verify that `curl -sI` returns 200 for `https://neeshthecoder.github.io/`, `/gym-routine/` and `/library/`, and that the live page body contains "Avaneesh"; report the live URL
