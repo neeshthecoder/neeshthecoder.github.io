@@ -43,7 +43,9 @@
   // The ring: a fixed round hole at the right end of the neck. Nothing ever enters it; the streams pile up
   // around its rim and shed squiggles behind it that settle into calm lines.
   const RING_U = 0.56;       // centre, as a fraction of the width
-  const RING_R = 0.15;       // radius, as a fraction of the half-height (capped by the width in start())
+  const RING_R = 0.15;       // radius of the visible ring, as a fraction of the half-height (capped by the width in start())
+  const POCKET = 1.45;       // the empty pocket the streams keep clear around the ring, as a multiple of its radius
+  const RING_GLYPHS = ".:'`,cuo()".split('');
 
   const CALM = ['-', '-', '-', '=', '-', '~'];
   const TEXT = '0OoIIl1|()UCDB@%/\\'.split('');      // dense jammed glyphs in the neck and lobe
@@ -118,7 +120,7 @@
       lines = Math.floor(H / rh);           // one stream per row of spacing where the bundle is full height
       half = (lines * rh) / 2;              // streams span ±half px around the vertical centre
       ringX = W * RING_U;
-      ringR = Math.min(half * RING_R, W * 0.07);
+      ringR = Math.min(half * RING_R, W * 0.07) * POCKET; // the streams work against the pocket, not the ring itself
       draw(performance.now());
     }
     // Each stream is traced as a curve: glyphs are spaced about one character apart along its length
@@ -178,6 +180,20 @@
       }
       grid.forEach((g) => buckets[Math.min(5, Math.floor(g[3] * 6))].push(g[0], g[1], g[2]));
       buckets[1].push(...spray);
+      // The ring itself: a thin dotted circle of small glyphs inside the pocket, with a dotted tail curling
+      // off its top-right into the flow. Positions and glyphs never change, so it stays put while the flow churns.
+      const rr = ringR / POCKET;
+      const n = Math.max(14, Math.round((2 * Math.PI * rr) / (cw * 1.5)));
+      for (let i = 0; i < n; i++) {
+        if (hash(i, 17, 3) < 0.2) continue; // a few gaps, so it reads as dotted
+        const th = (i / n) * 2 * Math.PI;
+        buckets[4].push(RING_GLYPHS[Math.floor(hash(i, 5, 11) * RING_GLYPHS.length)], ringX + Math.cos(th) * rr, cy + Math.sin(th) * rr);
+      }
+      for (let i = 0, m = Math.round((rr * 5) / (cw * 1.4)); i < m; i++) {
+        if (hash(i, 23, 7) < 0.25) continue;
+        const s = i / m, tx = ringX + rr * (0.75 + s * 5), ty = cy - rr * (0.65 + 1.1 * s - 0.55 * s * s);
+        if (tx < W - cw / 2) buckets[3].push(hash(i, 9, 2) < 0.7 ? '.' : '-', tx, ty);
+      }
       buckets.forEach((list, i) => {
         ctx.fillStyle = palette[i];
         for (let k = 0; k < list.length; k += 3) ctx.fillText(list[k], list[k + 1], list[k + 2]);
