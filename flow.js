@@ -25,44 +25,54 @@
       l(l(h(0, 0, 1), h(1, 0, 1), u), l(h(0, 1, 1), h(1, 1, 1), u), v), w) * 2 - 1;
   }
 
-  // Envelope (half-height of the stream bundle, 1 = full height):
-  // full height on the left, a long smooth funnel into a wide dense neck,
-  // a quick flare back to full height, then a loose turbulent lobe that settles into calm lines.
+  // Envelope (half-height of the stream bundle, 1 = full height). Lines run flat, then bend ever more
+  // steeply until they drop into a wide neck; past the ring they burst back out the same way.
   const NECK_W = 0.4;
-  const width = (u) => 1 - (1 - NECK_W) * Math.pow(smooth(0.18, 0.46, u), 1.6) * (1 - smooth(0.57, 0.67, u));
-  const dWidth = (u) => (width(u + 0.002) - width(u - 0.002)) / 0.004;
-  const turbulence = (u) => smooth(0.42, 0.52, u) * (1 - smooth(0.72, 0.88, u));
-  const core = (u) => smooth(0.42, 0.47, u) * (1 - smooth(0.52, 0.58, u)); // the dense jam piling up in front of the ring
+  const IN0 = 0.26, IN1 = 0.455;   // funnel: starts bending at IN0, steepest at IN1 (the neck's left edge)
+  const OUT0 = 0.6, OUT1 = 0.7;    // flare: steepest at OUT0 (the neck's right edge), full height by OUT1
+  const arc = (s) => 1 - Math.pow(s, 2.4); // flat at s = 0, steep (not vertical) at s = 1
+  function width(u) {
+    if (u <= IN0 || u >= OUT1) return 1;
+    if (u < IN1) return NECK_W + (1 - NECK_W) * arc((u - IN0) / (IN1 - IN0));
+    if (u > OUT0) return NECK_W + (1 - NECK_W) * arc((OUT1 - u) / (OUT1 - OUT0));
+    return NECK_W;
+  }
+  const core = (u) => smooth(IN1 - 0.01, IN1 + 0.01, u) * (1 - smooth(OUT0 - 0.01, OUT0 + 0.02, u)); // jammed neck
+  const lobe = (u) => smooth(OUT0 - 0.01, OUT0 + 0.03, u) * (1 - smooth(0.78, 0.9, u));             // the burst past the ring
 
-  // The ring: a fixed round obstacle just past the neck. Streams split around it and shed a wake behind it.
-  const RING_U = 0.6;        // centre, as a fraction of the width
-  const RING_R = 0.13;       // radius, as a fraction of the half-height (capped by the width in start())
+  // The ring: a fixed round hole at the right end of the neck. Nothing ever enters it; the streams pile up
+  // around its rim and shed squiggles behind it that settle into calm lines.
+  const RING_U = 0.56;       // centre, as a fraction of the width
+  const RING_R = 0.15;       // radius, as a fraction of the half-height (capped by the width in start())
 
   const CALM = ['-', '-', '-', '=', '-', '~'];
+  const TEXT = '0OoIIl1|()UCDB@%/\\'.split('');      // dense jammed glyphs in the neck and lobe
   const CHAOS = '()/\\|{}<>~^*%#@0o.:;\'`"_'.split('');
 
   // Vertical position (v, -1..1) of stream `k` of `lines` at horizontal position u (0..1).
   function streamV(k, lines, u, t) {
     const y0 = ((k + 0.5) / lines) * 2 - 1;
-    const tb = turbulence(u);
-    return y0 * width(u) + tb * 0.22 * noise(u * 6 - t * 0.8, y0 * 3 + k * 0.37, t * 0.3);
+    return y0 * width(u) + lobe(u) * 0.2 * noise(u * 6 - t * 0.8, y0 * 3 + k * 0.37, t * 0.3);
   }
 
-  // Glyph for stream `k` at u, given its on-screen slope (dy/dx): [char, brightness 0..1] or null for a gap.
-  function glyph(k, u, t, slope) {
-    const tb = turbulence(u), cr = core(u);
+  // Glyph for stream `k` at u, given its on-screen slope (dy/dx) and whether it sits in a jam
+  // (the neck, the lobe or the ring's rim): [char, brightness 0..1] or null for a gap.
+  function glyph(k, u, t, slope, jam, rim) {
+    const lb = lobe(u), cr = core(u);
     const phase = hash(k, 3, 7);
+    const cellU = Math.floor(u * 500);
+    const pulse = Math.pow(0.5 + 0.5 * Math.sin((u * 6 - t * SPEED * 6) + k * 0.7), 6);
+    const b = clamp(0.5 + 0.2 * cr + 0.3 * pulse, 0, 1);
+    if (jam) {
+      // packed text that shifts as the jam churns; looser in the lobe than in the neck
+      // the ring's rim is packed solid and bright, so the hole always reads as a ring
+      if (!rim && hash(cellU, k, Math.floor(t * 3 + phase * 7)) < 0.12 + lb * 0.4) return null;
+      const set = hash(cellU, k + 5, 1) < 0.8 ? TEXT : CHAOS;
+      return [set[Math.floor(hash(cellU, k, Math.floor(t * 2 + phase * 5)) * set.length)], rim ? 0.95 : b];
+    }
     // near-continuous streams with short gaps that travel along them; gaps widen in the turbulence
     const dash = fract(u * (40 + phase * 30) - t * SPEED * (0.8 + phase * 0.5) * 4 + phase);
-    if (dash > 0.95 - tb * 0.35) return null;
-    const cellU = Math.floor(u * 500);
-    // the lobe after the neck is loose and broken up
-    if (hash(cellU, k, Math.floor(t * 5 + phase * 7)) < (tb - cr) * 0.45) return null;
-
-    const pulse = Math.pow(0.5 + 0.5 * Math.sin((u * 6 - t * SPEED * 6) + k * 0.7), 6);
-    let b = clamp(0.5 + 0.2 * cr + 0.3 * pulse, 0, 1);
-    if (hash(cellU, k + 11, Math.floor(t * 6 + phase * 9)) < cr * 0.7 + tb * 0.35)
-      return [CHAOS[Math.floor(hash(cellU, k, Math.floor(t * 3)) * CHAOS.length)], b * 0.9];
+    if (dash > 0.95 - lb * 0.35) return null;
     if (Math.abs(slope) > 2.5) return ['|', b];
     if (slope > 0.5) return ['\\', b];
     if (slope < -0.5) return ['/', b];
@@ -135,6 +145,10 @@
         return [X, Y];
       };
       const inRing = (X, Y) => (X - ringX) * (X - ringX) + (Y - cy) * (Y - cy) < R2;
+      // Jammed glyphs snap to a grid of text rows (one row per stream spacing), so the neck, the lobe and
+      // the ring's rim read as packed lines of text; free-flowing streams stay smooth curves.
+      const rh = (half * 2) / lines, top = cy - half;
+      const cols = Math.ceil(W / cw), grid = new Map();
       const spray = [];
       for (let k = 0; k < lines; k++) {
         let x = cw / 2;
@@ -142,26 +156,27 @@
           const [X, Y] = pt(k, x), a = pt(k, x - 1), b = pt(k, x + 1);
           const ddx = (b[0] - a[0]) / 2, ddy = (b[1] - a[1]) / 2;
           const slope = ddy / (Math.abs(ddx) < 1e-3 ? 1e-3 : ddx);
-          const g = glyph(k, x / W, t, slope);
-          if (g && X > cw / 2 && X < W - cw / 2 && Y > FONT_PX / 2 && Y < H - FONT_PX / 2 && !inRing(X, Y))
-            buckets[Math.min(5, Math.floor(g[1] * 6))].push(g[0], X, Y);
-          // sparse spray drifting off the turbulent streams
-          const tb = turbulence(x / W);
+          const u = x / W, dR = Math.hypot(X - ringX, Y - cy);
+          const wakeZone = X > ringX + ringR * 1.7 && Math.abs(Y - cy) < ringR * 1.6;
+          const jam = !wakeZone && (core(u) > 0.5 || lobe(u) > 0.35 || dR < ringR * 1.6);
+          const g = glyph(k, u, t, slope, jam, dR < ringR * 1.35);
+          if (g && X > cw / 2 && X < W - cw / 2 && Y > FONT_PX / 2 && Y < H - FONT_PX / 2 && !inRing(X, Y)) {
+            if (jam) {
+              const c = Math.round(X / cw - 0.5), r = Math.round((Y - top) / rh - 0.5);
+              const gx = (c + 0.5) * cw, gy = top + (r + 0.5) * rh;
+              if (!inRing(gx, gy) && gy > FONT_PX / 2 && gy < H - FONT_PX / 2) grid.set(r * cols + c, [g[0], gx, gy, g[1]]);
+            } else buckets[Math.min(5, Math.floor(g[1] * 6))].push(g[0], X, Y);
+          }
+          // sparse spray drifting off the lobe
+          const tb = lobe(u);
           if (tb > 0.3 && hash(Math.floor(x), k, Math.floor(t * 4)) > 0.995 - tb * 0.006) {
             const sy = Y + (hash(k, Math.floor(x), 9) - 0.5) * half * 0.5;
             if (!inRing(X, sy)) spray.push('.', X, sy);
           }
-          x += clamp(cw / Math.hypot(ddx, ddy), cw * 0.08, cw * 1.2) * 1.15;
+          x += clamp(cw / Math.hypot(ddx, ddy), 0.02, cw * 1.2) * 1.15;
         }
       }
-      // the ring itself: a fixed ASCII circle, drawn the same every frame
-      const ringN = Math.max(12, Math.round((2 * Math.PI * ringR * 0.8) / (cw * 1.1)));
-      for (let i = 0; i < ringN; i++) {
-        const th = (i / ringN) * 2 * Math.PI, rx = ringX + Math.cos(th) * ringR * 0.8, ry = cy + Math.sin(th) * ringR * 0.8;
-        const tan = -Math.cos(th) / (Math.sin(th) || 1e-6); // slope of the tangent, screen dy/dx
-        const ch = Math.abs(tan) > 2.5 ? '|' : tan > 0.4 ? '\\' : tan < -0.4 ? '/' : '-';
-        buckets[3].push(ch, rx, ry);
-      }
+      grid.forEach((g) => buckets[Math.min(5, Math.floor(g[3] * 6))].push(g[0], g[1], g[2]));
       buckets[1].push(...spray);
       buckets.forEach((list, i) => {
         ctx.fillStyle = palette[i];
