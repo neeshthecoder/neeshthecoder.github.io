@@ -31,7 +31,7 @@
     });
     // Lock each box to its final letter's width so nothing shifts while symbols cycle.
     chars.forEach(s => { s.style.width = s.getBoundingClientRect().width + 'px'; });
-    chars.forEach(s => { s.classList.add('is-scrambling'); s.textContent = random(); });
+    chars.forEach((s, i) => { if (text[i] !== ' ') { s.classList.add('is-scrambling'); s.textContent = random(); } });
     el.style.visibility = '';
 
     const t0 = performance.now();
@@ -45,7 +45,7 @@
             s.classList.remove('is-scrambling');
           }
         } else {
-          s.textContent = random();
+          if (text[i] !== ' ') s.textContent = random();
           done = false;
         }
       });

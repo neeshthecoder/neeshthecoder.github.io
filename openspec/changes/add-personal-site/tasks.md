@@ -42,3 +42,4 @@
 - [x] 7.1 Replace the `.ps-header` band with `header > h1.display` sized `clamp(56px, 2.5rem + 3vw, 88px)`; verify that the measured name width is below the paragraph width at all three viewports
 - [x] 7.2 Add a deferred `scramble.js` with reduced-motion and no-JS fallbacks, fixed-width letter boxes and `aria-label` during the animation; verify a mid-animation screenshot, the final text "Avaneesh" with no `aria-label`, and that reduced motion renders no spans
 - [x] 7.3 Re-run the viewport, focus, colour and third-card checks; verify ALL PASS, update README, then push and confirm the live page serves `scramble.js`
+- [x] 7.4 Show the full name "Avaneesh Babu" sized `clamp(28px, min(15vw - 12px, 2.8rem + 1vw), 56px)`, with the space excluded from the scramble; verify with a 320–1600px width sweep that the name is always narrower than the paragraph, and that all checks pass

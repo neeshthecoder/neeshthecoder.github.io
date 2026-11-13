@@ -14,12 +14,13 @@ body {
   grid-template-rows: auto 1fr;
 }
 
-/* Name: the styleguide's .display hero style, sized between heading-1 and display
+/* Name: the styleguide's .display hero style, sized up to heading-1 (56px)
    so it is never wider than the paragraph below it. */
 .site-name__text {
   margin: 0;
   color: var(--ink);
-  font-size: clamp(56px, 2.5rem + 3vw, 88px);
+  /* tracks both the viewport (phones) and the paragraph’s own fluid size (tablets) */
+  font-size: clamp(28px, min(15vw - 12px, 2.8rem + 1vw), 56px);
   white-space: nowrap;
   font-kerning: none; /* keeps letter positions identical while scrambling and after */
 }
@@ -28,6 +29,7 @@ body {
 .site-name__text .scramble-char {
   display: inline-block;
   text-align: center;
+  white-space: pre; /* keeps the space between first and last name */
 }
 
 .site-name__text .scramble-char.is-scrambling {
