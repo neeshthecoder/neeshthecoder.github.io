@@ -1,0 +1,73 @@
+/* page.css — layout for the single-screen home page.
+   Loaded after styles.css. Uses only existing tokens and type-scale sizes. */
+
+/* Page frame: header, then main filling the rest of the viewport. */
+body {
+  box-sizing: border-box;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-10) var(--space-10);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+}
+
+/* Intro on top, projects row pinned to the bottom. */
+.intro {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding-top: clamp(var(--space-5), 6dvh, var(--space-20));
+}
+
+.intro__text {
+  margin: 0;
+  max-width: 36ch; /* ch is the "0" glyph; 36ch ≈ 44–48 average characters in Inter Tight */
+  color: var(--ink-soft);
+  font-size: clamp(16px, 0.9rem + 0.35vw, 19px);
+}
+
+/* Projects row: never stretches cards; scrolls inside itself if it outgrows the width. */
+.projects {
+  display: flex;
+  justify-content: flex-start;
+  gap: var(--space-5);
+  overflow-x: auto;
+}
+
+.projects .ps-card {
+  flex: 0 0 auto;
+  width: min(220px, calc((100% - var(--space-5)) / 2));
+  min-height: min(260px, 30dvh);
+}
+
+.projects .ps-card__label {
+  font-size: clamp(12px, 0.6rem + 0.6vw, 18px);
+}
+
+.projects .ps-card__body {
+  font-size: clamp(16px, 0.9rem + 0.35vw, 19px);
+}
+
+/* Plain underlined link; focus ring lives on the link, not the clipped card. */
+.project-link {
+  color: var(--ink);
+  font-weight: 400;
+  text-decoration: underline;
+  text-decoration-thickness: var(--hairline);
+  text-underline-offset: 0.18em;
+}
+
+.project-link:hover {
+  text-underline-offset: 0.3em;
+}
+
+.project-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
