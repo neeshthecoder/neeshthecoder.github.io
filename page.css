@@ -16,11 +16,19 @@ body {
 
 /* Name: the styleguide's .display hero style, sized up to heading-1 (56px)
    so it is never wider than the paragraph below it. */
+/* The header is exactly as wide as the intro paragraph: same font size, same 36ch cap.
+   The name is then sized against that width (cqi), so it can never be wider than the paragraph. */
+.site-name {
+  max-width: 36ch;
+  font-size: clamp(16px, 0.9rem + 0.35vw, 19px);
+  container-type: inline-size;
+}
+
 .site-name__text {
   margin: 0;
   color: var(--ink);
-  /* tracks both the viewport (phones) and the paragraph’s own fluid size (tablets) */
-  font-size: clamp(28px, min(15vw - 12px, 2.8rem + 1vw), 56px);
+  /* "Avaneesh Babu" is ~6.3em wide, so 15cqi fills ~94% of the paragraph width; capped at heading-1 */
+  font-size: min(56px, 15cqi);
   white-space: nowrap;
   font-kerning: none; /* keeps letter positions identical while scrambling and after */
 }
