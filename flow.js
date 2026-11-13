@@ -4,8 +4,8 @@
    Colors come from styles.css tokens, so it follows light/dark mode. */
 (function () {
   // ---------- tunables ----------
-  const FONT_PX = 11;        // character size
-  const LINES = 26;          // number of streams
+  const FONT_PX = 10;        // character size
+  const ROW_GAP = 2.2;       // row height as a multiple of FONT_PX: thin streams with air between them
   const SPEED = 0.22;        // flow speed
   const FPS = 30;
 
@@ -25,60 +25,44 @@
       l(l(h(0, 0, 1), h(1, 0, 1), u), l(h(0, 1, 1), h(1, 1, 1), u), v), w) * 2 - 1;
   }
 
-  // Envelope: full height on the left, pinched neck, wide messy bloom on the right.
-  const NECK = 0.4;
-  function width(u) {
-    const sigma = u < NECK ? 0.13 : 0.06;
-    const pinch = Math.exp(-Math.pow((u - NECK) / sigma, 2));
-    const bloom = 0.06 * Math.exp(-Math.pow((u - 0.58) / 0.1, 2)); // slight swell after the neck
-    return 0.8 - 0.74 * pinch + bloom;
-  }
+  // Envelope (half-height of the stream bundle, 1 = full height):
+  // full height on the left, a long smooth funnel into a wide dense neck,
+  // a quick flare back to full height, then a loose turbulent lobe that settles into calm lines.
+  const NECK_W = 0.4;
+  const width = (u) => 1 - (1 - NECK_W) * Math.pow(smooth(0.18, 0.46, u), 1.6) * (1 - smooth(0.57, 0.67, u));
   const dWidth = (u) => (width(u + 0.002) - width(u - 0.002)) / 0.004;
-  const turbulence = (u) => smooth(0.4, 0.48, u) * (1 - smooth(0.58, 0.86, u));
+  const turbulence = (u) => smooth(0.42, 0.52, u) * (1 - smooth(0.72, 0.88, u));
+  const core = (u) => smooth(0.42, 0.47, u) * (1 - smooth(0.56, 0.62, u)); // the dense jammed block in the neck
 
-  const CALM = ['-', '-', '=', '~'];
+  const CALM = ['-', '-', '-', '=', '-', '~'];
   const CHAOS = '()/\\|{}<>~^*%#@0o.:;\'`"_'.split('');
 
-  // Returns [char, brightness 0..1] or null for one cell.
-  function cell(u, v, t, rowV, aspect) {
-    const w = width(u);
+  // Vertical position (v, -1..1) of stream `k` of `lines` at horizontal position u (0..1).
+  function streamV(k, lines, u, t) {
+    const y0 = ((k + 0.5) / lines) * 2 - 1;
     const tb = turbulence(u);
-    let y0 = v / w;
-    y0 += tb * 0.3 * noise(u * 7 - t * 0.9, y0 * 2.5, t * 0.35);
-    if (Math.abs(y0) > 1.02) {
-      // sparse spray around the turbulent region
-      if (tb > 0.2 && hash(Math.floor(u * 400), Math.floor(v * 200), Math.floor(t * 4)) > 0.985 - tb * 0.02)
-        return ['.', 0.25];
-      return null;
-    }
-    const s = (y0 + 1) / 2 * LINES;
-    const line = Math.floor(s);
-    const distV = Math.abs(fract(s) - 0.5) * 2 * w / LINES; // distance to stream centre, in v units
-    if (distV > rowV * 0.55 + tb * rowV * 0.6) return null;
+    return y0 * width(u) + tb * 0.22 * noise(u * 6 - t * 0.8, y0 * 3 + k * 0.37, t * 0.3);
+  }
 
-    // dashes travelling along each stream
-    const phase = hash(line, 3, 7);
-    const dash = fract(u * (10 + phase * 6) - t * SPEED * (0.8 + phase * 0.5) + phase);
-    if (dash > 0.82 + (1 - tb) * 0.1) return null;
+  // Glyph for stream `k` at u, given its on-screen slope (dy/dx): [char, brightness 0..1] or null for a gap.
+  function glyph(k, u, t, slope) {
+    const tb = turbulence(u), cr = core(u);
+    const phase = hash(k, 3, 7);
+    // near-continuous streams with short gaps that travel along them; gaps widen in the turbulence
+    const dash = fract(u * (40 + phase * 30) - t * SPEED * (0.8 + phase * 0.5) * 4 + phase);
+    if (dash > 0.95 - tb * 0.35) return null;
+    const cellU = Math.floor(u * 500);
+    // the lobe after the neck is loose and broken up
+    if (hash(cellU, k, Math.floor(t * 5 + phase * 7)) < (tb - cr) * 0.45) return null;
 
-    // a brighter pulse that rides the flow
-    const pulse = Math.pow(0.5 + 0.5 * Math.sin((u * 6 - t * SPEED * 6) + line * 0.7), 6);
-    const neck = Math.exp(-Math.pow((u - NECK) / 0.08, 2));
-    const edge = 1 - Math.abs(y0) * 0.45;
-    let b = clamp(0.28 + 0.35 * edge + 0.3 * neck + 0.35 * pulse, 0, 1);
-
-    let ch;
-    if (tb > 0.35 && hash(Math.floor(u * 300), line, Math.floor(t * 6 + phase * 9)) < tb * 0.45) {
-      ch = CHAOS[Math.floor(hash(Math.floor(u * 300), line, Math.floor(t * 3)) * CHAOS.length)];
-      b *= 0.85;
-    } else {
-      const slope = (y0 * dWidth(u)) * aspect; // screen dy/dx
-      if (Math.abs(slope) > 2.2) ch = '|';
-      else if (slope > 0.35) ch = '\\';
-      else if (slope < -0.35) ch = '/';
-      else ch = CALM[Math.floor(phase * CALM.length + pulse * 2) % CALM.length];
-    }
-    return [ch, b];
+    const pulse = Math.pow(0.5 + 0.5 * Math.sin((u * 6 - t * SPEED * 6) + k * 0.7), 6);
+    let b = clamp(0.5 + 0.2 * cr + 0.3 * pulse, 0, 1);
+    if (hash(cellU, k + 11, Math.floor(t * 6 + phase * 9)) < cr * 0.7 + tb * 0.35)
+      return [CHAOS[Math.floor(hash(cellU, k, Math.floor(t * 3)) * CHAOS.length)], b * 0.9];
+    if (Math.abs(slope) > 2.5) return ['|', b];
+    if (slope > 0.5) return ['\\', b];
+    if (slope < -0.5) return ['/', b];
+    return [CALM[Math.floor(phase * CALM.length + pulse * 2) % CALM.length], b];
   }
 
   // ---------- rendering ----------
@@ -95,7 +79,7 @@
   function start(canvas) {
     const ctx = canvas.getContext('2d');
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let W = 0, H = 0, cw = 0, rh = 0, cols = 0, rows = 0, palette = [], raf = 0, last = 0, visible = true;
+    let W = 0, H = 0, cw = 0, lines = 0, half = 0, palette = [], raf = 0, last = 0, visible = true;
     const t0 = performance.now();
 
     function readTheme() {
@@ -113,25 +97,37 @@
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       readTheme();
-      ctx.textBaseline = 'top';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
       cw = ctx.measureText('M').width || FONT_PX * 0.6;
-      rh = FONT_PX * 1.25;
-      cols = Math.floor(W / cw); rows = Math.floor(H / rh);
+      const rh = FONT_PX * ROW_GAP;
+      lines = Math.floor(H / rh);           // one stream per row of spacing where the bundle is full height
+      half = (lines * rh) / 2;              // streams span ±half px around the vertical centre
       draw(performance.now());
     }
+    // Each stream is traced as a curve: glyphs are spaced about one character apart along its length
+    // (not snapped to a row grid), so steep parts stay thin.
     function draw(now) {
       const t = (now - t0) / 1000;
       ctx.clearRect(0, 0, W, H);
-      if (!cols || !rows) return;
-      const rowV = 2 / rows, aspect = (H / 2) / W;
+      if (!lines || W < cw * 4) return;
       const buckets = palette.map(() => []);
-      for (let r = 0; r < rows; r++) {
-        const v = (r + 0.5) / rows * 2 - 1;
-        for (let c = 0; c < cols; c++) {
-          const res = cell((c + 0.5) / cols, v, t, rowV, aspect);
-          if (res) buckets[Math.min(5, Math.floor(res[1] * 6))].push(res[0], c * cw, r * rh);
+      const yOf = (k, x) => H / 2 + streamV(k, lines, x / W, t) * half;
+      const spray = [];
+      for (let k = 0; k < lines; k++) {
+        let x = cw / 2;
+        while (x < W - cw / 2) {
+          const y = yOf(k, x), slope = (yOf(k, x + 1) - yOf(k, x - 1)) / 2;
+          const g = glyph(k, x / W, t, slope);
+          if (g && y > FONT_PX / 2 && y < H - FONT_PX / 2) buckets[Math.min(5, Math.floor(g[1] * 6))].push(g[0], x, y);
+          // sparse spray drifting off the turbulent streams
+          const tb = turbulence(x / W);
+          if (tb > 0.3 && hash(Math.floor(x), k, Math.floor(t * 4)) > 0.995 - tb * 0.006)
+            spray.push('.', x, y + (hash(k, Math.floor(x), 9) - 0.5) * half * 0.5);
+          x += Math.max(cw / Math.sqrt(1 + slope * slope), cw * 0.3) * 1.15;
         }
       }
+      buckets[1].push(...spray);
       buckets.forEach((list, i) => {
         ctx.fillStyle = palette[i];
         for (let k = 0; k < list.length; k += 3) ctx.fillText(list[k], list[k + 1], list[k + 2]);
@@ -161,6 +157,6 @@
     const go = () => document.querySelectorAll('canvas.flow').forEach(start);
     document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go) : go();
   } else {
-    module.exports = { cell }; // lets node render a text preview
+    module.exports = { streamV, glyph }; // lets node render a text preview
   }
 })();
