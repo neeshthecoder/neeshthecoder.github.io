@@ -6,12 +6,32 @@ body {
   box-sizing: border-box;
   max-width: 1440px;
   margin-inline: auto;
-  padding: var(--space-5) var(--space-10) var(--space-10);
+  padding: var(--space-10);
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
+}
+
+/* Name: the styleguide's .display hero style, sized between heading-1 and display
+   so it is never wider than the paragraph below it. */
+.site-name__text {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(56px, 2.5rem + 3vw, 88px);
+  white-space: nowrap;
+  font-kerning: none; /* keeps letter positions identical while scrambling and after */
+}
+
+/* Scramble effect (scramble.js): each letter is a fixed-width box while it cycles. */
+.site-name__text .scramble-char {
+  display: inline-block;
+  text-align: center;
+}
+
+.site-name__text .scramble-char.is-scrambling {
+  color: var(--ink-soft);
 }
 
 /* Intro on top, projects row pinned to the bottom. */

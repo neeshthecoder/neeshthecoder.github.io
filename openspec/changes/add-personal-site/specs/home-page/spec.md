@@ -18,11 +18,30 @@ The page SHALL declare `lang="en"`, a responsive viewport meta tag, the title "A
 - **THEN** it exposes a banner (header), a main region, and a projects section with an accessible name
 
 ### Requirement: Name header
-The page SHALL show the name "Avaneesh" at the top inside a site header styled as the design system's header (surface-200 background, its single allowed shadow), with no button, search or menu controls.
+The page SHALL show the name "Avaneesh" at the top as the page's main heading in the display style (Inter Tight 400, tight tracking, ink on paper), with no grey band, shadow, buttons or icons, sized between the heading-1 and display sizes and never wider than the intro paragraph.
 
 #### Scenario: Header content
 - **WHEN** the page loads
-- **THEN** the header shows only the text "Avaneesh" and contains no buttons or icons
+- **THEN** the header contains only an `h1` reading "Avaneesh" on the paper background, with no buttons or icons
+
+#### Scenario: Name width
+- **WHEN** the page is viewed at 1440×900, 1280×720 or 390×844
+- **THEN** the rendered name is narrower than the intro paragraph and stays on one line
+
+### Requirement: Name decode effect
+On load, the name SHALL briefly show cycling symbols (such as & % # @) that lock into the real letters from left to right within about one and a half seconds, without shifting the layout; the effect SHALL be skipped when reduced motion is preferred or scripts are unavailable.
+
+#### Scenario: Decode on load
+- **WHEN** the page loads with scripts enabled and no reduced-motion preference
+- **THEN** the name's letters show symbols, then settle to "Avaneesh" as plain text, and nothing else on the page moves
+
+#### Scenario: Reduced motion or no scripts
+- **WHEN** the browser prefers reduced motion or JavaScript is disabled
+- **THEN** the name shows as "Avaneesh" immediately with no animation
+
+#### Scenario: Assistive technology
+- **WHEN** a screen reader reads the heading during or after the effect
+- **THEN** it announces "Avaneesh", not the symbols
 
 ### Requirement: Intro paragraph
 The page SHALL show the intro paragraph below the header with the exact supplied copy, using typographic apostrophes (’), in the ink-soft colour, at the body-lg style, limited to a reading width of about 40–48 characters.
@@ -104,9 +123,13 @@ Adding a project SHALL require only copying one card element in the markup; no C
 - **THEN** it appears in the row with the same size and gutter as the others, with no stylesheet edits
 - **AND** if the row exceeds the available width, only the row scrolls horizontally, not the page
 
-### Requirement: No scripts or build
-The page SHALL work as static files with no JavaScript, framework or build step.
+### Requirement: Static files, script only for enhancement
+The page SHALL work as static files with no framework or build step; its only script SHALL be the name decode effect, and the page SHALL render completely with JavaScript disabled.
 
 #### Scenario: Static delivery
 - **WHEN** the repository's files are served as-is by a static host
-- **THEN** the page renders completely and contains no `<script>` elements
+- **THEN** the page renders completely, and the only `<script>` is the deferred `scramble.js`
+
+#### Scenario: JavaScript disabled
+- **WHEN** the page loads with JavaScript disabled
+- **THEN** the name, paragraph and project cards all render normally

@@ -36,7 +36,7 @@ See `proposal.md` for motivation and `specs/home-page/spec.md` and `specs/site-h
 - Intro: `.body-lg` with `color: var(--ink-soft)`, `max-width: 36ch` (`ch` is the width of "0", which is wide in Inter Tight, so 36ch gives about 43 real characters per line; 46ch measured about 60), `font-size: clamp(16px, 0.9rem + 0.35vw, 19px)`. 16px (`.body`) and 19px (`.body-lg`) are both on the scale.
 - Card label: `clamp(12px, …, 18px)` (`.caption` to `.label`). Card link: the same clamp as the intro.
 - Spacing between header and paragraph: `clamp(var(--space-5), 6dvh, var(--space-20))`. All bounds are tokens.
-- Header name stays at the component's 19px.
+- Name (revised after launch): no `.ps-header` band. An `h1.display` with `font-size: clamp(56px, 2.5rem + 3vw, 88px)` (heading-1 to display), measured at 224–333px wide against a 310–395px paragraph. `font-kerning: none` keeps letter positions identical during and after the scramble.
 
 ### 3. Card size on narrow screens
 Cards keep the component's 220px width where it fits and shrink to share the row on phones: `flex: 0 0 auto; width: min(220px, calc((100% - var(--space-5)) / 2))`. At 390px each card is 145px. Height becomes `min-height: min(260px, 30dvh)` so short desktop windows also fit. The styleguide says "the consumer provides the width", so this override is allowed. The notch stays `--notch-sm` from `.ps-card--sm`.
@@ -52,7 +52,7 @@ Focus: `.project-link:focus-visible { outline: 2px solid var(--ink); outline-off
 
 ### 6. Markup
 ```html
-<header class="ps-header"><span class="ps-header__name">Avaneesh</span></header>
+<header class="site-name"><h1 class="display site-name__text" data-scramble>Avaneesh</h1></header>
 <main class="intro">
   <p class="body-lg intro__text">Hey, I’m Avaneesh. …</p>
   <section class="projects" aria-label="Projects">
@@ -75,6 +75,9 @@ The name is a `<span>`, not a link, because the page has nowhere to go. The labe
 
 ### 8. Verification approach
 Viewport checks use a headless browser driven from the scratchpad, not committed: Playwright via `npx`, or Chrome `--headless --screenshot` if Playwright is unavailable. It loads the local `index.html` at each viewport in both `colorScheme: light` and `dark`, asserts that `scrollHeight <= innerHeight` and `scrollWidth <= innerWidth`, asserts that every card's bounding box is inside the viewport, tabs to each link and screenshots the focus ring, and repeats with a temporarily duplicated third card (the edit is reverted afterwards).
+
+### 9. Name decode effect (added after launch at the user's request)
+`scramble.js`, about 50 lines and loaded with `defer`, is the page's only script. It is an enhancement: with no JS or with `prefers-reduced-motion: reduce`, the plain `h1` shows. Otherwise it waits for `document.fonts.ready` (capped at 1.2s) with the heading hidden, splits the name into `aria-hidden` spans with `aria-label` on the `h1`, and locks each span to its final glyph's width so symbols never shift the layout. Each span cycles symbols every 45ms in `--ink-soft`; letters lock left to right 250ms + 85ms × index after the start (about 0.9s in total). The plain text node is then restored. Alternative considered: CSS-only `content` keyframes. Rejected because Safari's support for animating `content` is unreliable.
 
 ## Risks / Trade-offs
 

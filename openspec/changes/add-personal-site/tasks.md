@@ -36,3 +36,9 @@
 - [x] 6.2 `gh repo create neeshthecoder.github.io --public --source . --remote origin --push`; verify that `gh repo view neeshthecoder/neeshthecoder.github.io --json visibility` reports PUBLIC and that `main` is pushed
 - [x] 6.3 Enable Pages from `main` `/` via `gh api` (treat 409 as already enabled); verify that `gh api repos/neeshthecoder/neeshthecoder.github.io/pages` shows source `main` and path `/`
 - [x] 6.4 Poll `pages/builds/latest` until it is `built`; verify that `curl -sI` returns 200 for `https://neeshthecoder.github.io/`, `/gym-routine/` and `/library/`, and that the live page body contains "Avaneesh"; report the live URL
+
+## 7. Name restyle and decode effect (post-launch revision)
+
+- [x] 7.1 Replace the `.ps-header` band with `header > h1.display` sized `clamp(56px, 2.5rem + 3vw, 88px)`; verify that the measured name width is below the paragraph width at all three viewports
+- [x] 7.2 Add a deferred `scramble.js` with reduced-motion and no-JS fallbacks, fixed-width letter boxes and `aria-label` during the animation; verify a mid-animation screenshot, the final text "Avaneesh" with no `aria-label`, and that reduced motion renders no spans
+- [x] 7.3 Re-run the viewport, focus, colour and third-card checks; verify ALL PASS, update README, then push and confirm the live page serves `scramble.js`
