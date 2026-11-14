@@ -1,13 +1,23 @@
-/* flow.js — a field of monospace characters streaming left to right,
-   squeezing through a bottleneck and breaking into turbulence.
+/* flow.js — rows of monospace characters streaming left to right. They funnel
+   into a bottleneck, scramble into a bloom of glyphs, then settle back into rows.
    Usage: <canvas class="flow" aria-hidden="true"></canvas> + <script src="flow.js" defer></script>
-   Colors come from styles.css tokens, so it follows light/dark mode. */
+   Colors come from styles.css tokens (--rule, --ink, --font-mono), so it follows light/dark mode. */
 (function () {
   // ---------- tunables ----------
-  const FONT_PX = 10;        // character size
-  const ROW_GAP = 2.2;       // row height as a multiple of FONT_PX: thin streams with air between them
-  const SPEED = 0.22;        // flow speed
+  const FONT_PX = 11;   // character size
+  const SPEED = 7;      // flow speed, in characters per second
   const FPS = 30;
+
+  // Where things happen, as a fraction of the canvas width.
+  const FUNNEL = 0.24;  // rows start bending inward
+  const NECK = 0.45;    // tightest point
+  const BLOOM = 0.6;    // scramble has fanned back out to full height
+  const RESUME = 0.76;  // rows re-form
+  const NECK_H = 0.14;  // height of the neck, as a fraction of full height
+
+  const ROWS_IN = 'oooooooo0-';   // glyphs for the incoming rows (picked per run)
+  const ROWS_OUT = '-------o=';   // glyphs for the re-formed rows
+  const CHAOS = '00001111OOIIBCDUGERSL()()//\\\\||{}<>;:.,\'%#@'.split('');
 
   // ---------- math helpers ----------
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -25,60 +35,68 @@
       l(l(h(0, 0, 1), h(1, 0, 1), u), l(h(0, 1, 1), h(1, 1, 1), u), v), w) * 2 - 1;
   }
 
-  // Envelope (half-height of the stream bundle, 1 = full height). Lines run flat, then bend ever more
-  // steeply until they drop into a wide neck; past the ring they burst back out the same way.
-  const NECK_W = 0.4;
-  const IN0 = 0.26, IN1 = 0.455;   // funnel: starts bending at IN0, steepest at IN1 (the neck's left edge)
-  const OUT0 = 0.6, OUT1 = 0.7;    // flare: steepest at OUT0 (the neck's right edge), full height by OUT1
-  const arc = (s) => 1 - Math.pow(s, 2.4); // flat at s = 0, steep (not vertical) at s = 1
-  function width(u) {
-    if (u <= IN0 || u >= OUT1) return 1;
-    if (u < IN1) return NECK_W + (1 - NECK_W) * arc((u - IN0) / (IN1 - IN0));
-    if (u > OUT0) return NECK_W + (1 - NECK_W) * arc((OUT1 - u) / (OUT1 - OUT0));
-    return NECK_W;
-  }
-  const core = (u) => smooth(IN1 - 0.01, IN1 + 0.01, u) * (1 - smooth(OUT0 - 0.01, OUT0 + 0.02, u)); // jammed neck
-  const lobe = (u) => smooth(OUT0 - 0.01, OUT0 + 0.03, u) * (1 - smooth(0.78, 0.9, u));             // the burst past the ring
-
-  // The ring: a fixed round hole at the right end of the neck. Nothing ever enters it; the streams pile up
-  // around its rim and shed squiggles behind it that settle into calm lines.
-  const RING_U = 0.56;       // centre, as a fraction of the width
-  const RING_R = 0.15;       // radius of the visible ring, as a fraction of the half-height (capped by the width in start())
-  const POCKET = 1.45;       // the empty pocket the streams keep clear around the ring, as a multiple of its radius
-  const RING_GLYPHS = ".:'`,cuo()".split('');
-
-  const CALM = ['-', '-', '-', '=', '-', '~'];
-  const TEXT = '0OoIIl1|()UCDB@%/\\'.split('');      // dense jammed glyphs in the neck and lobe
-  const CHAOS = '()/\\|{}<>~^*%#@0o.:;\'`"_'.split('');
-
-  // Vertical position (v, -1..1) of stream `k` of `lines` at horizontal position u (0..1).
-  function streamV(k, lines, u, t) {
-    const y0 = ((k + 0.5) / lines) * 2 - 1;
-    return y0 * width(u) + lobe(u) * 0.2 * noise(u * 6 - t * 0.8, y0 * 3 + k * 0.37, t * 0.3);
-  }
-
-  // Glyph for stream `k` at u, given its on-screen slope (dy/dx) and whether it sits in a jam
-  // (the neck, the lobe or the ring's rim): [char, brightness 0..1] or null for a gap.
-  function glyph(k, u, t, slope, jam, rim) {
-    const lb = lobe(u), cr = core(u);
-    const phase = hash(k, 3, 7);
-    const cellU = Math.floor(u * 500);
-    const pulse = Math.pow(0.5 + 0.5 * Math.sin((u * 6 - t * SPEED * 6) + k * 0.7), 6);
-    const b = clamp(0.5 + 0.2 * cr + 0.3 * pulse, 0, 1);
-    if (jam) {
-      // packed text that shifts as the jam churns; looser in the lobe than in the neck
-      // the ring's rim is packed solid and bright, so the hole always reads as a ring
-      if (!rim && hash(cellU, k, Math.floor(t * 3 + phase * 7)) < 0.12 + lb * 0.4) return null;
-      const set = hash(cellU, k + 5, 1) < 0.8 ? TEXT : CHAOS;
-      return [set[Math.floor(hash(cellU, k, Math.floor(t * 2 + phase * 5)) * set.length)], rim ? 0.95 : b];
+  // Envelope (1 = full height): a rounded shoulder into the neck, a straight cone out of it.
+  function envelope(u) {
+    if (u <= FUNNEL || u >= BLOOM) return 1;
+    if (u < NECK) {
+      const s = (u - FUNNEL) / (NECK - FUNNEL);
+      return NECK_H + (1 - NECK_H) * Math.pow(Math.cos(s * Math.PI / 2), 0.75);
     }
-    // near-continuous streams with short gaps that travel along them; gaps widen in the turbulence
-    const dash = fract(u * (40 + phase * 30) - t * SPEED * (0.8 + phase * 0.5) * 4 + phase);
-    if (dash > 0.95 - lb * 0.35) return null;
-    if (Math.abs(slope) > 2.5) return ['|', b];
-    if (slope > 0.5) return ['\\', b];
-    if (slope < -0.5) return ['/', b];
-    return [CALM[Math.floor(phase * CALM.length + pulse * 2) % CALM.length], b];
+    return NECK_H + (1 - NECK_H) * Math.pow((u - NECK) / (BLOOM - NECK), 0.85);
+  }
+  const dEnvelope = (u) => (envelope(u + 0.002) - envelope(u - 0.002)) / 0.004;
+
+  // One character of an orderly row. `line` is which stream this cell belongs to.
+  function stream(c, line, u, y0, t, glyphs, aspect) {
+    const ph = hash(line, 3, 7);
+    const x = c - t * SPEED * (0.7 + 0.6 * ph) + ph * 97;
+    const len = 6 + Math.floor(ph * 7);
+    const run = Math.floor(x / len);
+    const hr = hash(run, line, 1);
+    if (hr > 0.93) return null;                                  // a gap in the row
+    if (hr > 0.55 && Math.floor(x) - run * len === 0) return null; // one-cell break between runs
+    const pulse = Math.pow(0.5 + 0.5 * Math.sin(u * 7 - t * 1.3 + line * 0.6), 6);
+    const slope = y0 * dEnvelope(u) * aspect;                    // on-screen dy/dx
+    let ch, b = 0.3 + 0.3 * pulse;
+    if (Math.abs(slope) > 2.2) { ch = '|'; b += 0.25; }
+    else if (slope > 0.38) { ch = '\\'; b += 0.2; }
+    else if (slope < -0.38) { ch = '/'; b += 0.2; }
+    else ch = glyphs[Math.floor(hash(run, line, 2) * glyphs.length)];
+    return [ch, clamp(b, 0, 1)];
+  }
+
+  // Returns [char, brightness 0..1] or null for the cell at column c, row r.
+  function cell(c, r, cols, rows, t, aspect) {
+    const u = (c + 0.5) / cols, v = (r + 0.5) / rows * 2 - 1;
+
+    // the cone's edge breathes a little so the bloom never looks ruled
+    const cone = smooth(NECK, NECK + 0.04, u) * (1 - smooth(BLOOM - 0.02, BLOOM + 0.05, u));
+    const w = envelope(u) * (1 + cone * 0.16 * noise(u * 11 - t * 0.35, v * 2.5, t * 0.3));
+    const y0 = v / w;
+    if (Math.abs(y0) > 1) return null;
+
+    const resumeAt = RESUME + (hash(r, 11, 5) - 0.5) * 0.08;     // each row re-forms at its own spot
+    if (u >= resumeAt) return stream(c, r, u, 0, t, ROWS_OUT, aspect);
+
+    // scramble: clumps of glyphs that drift downstream and flicker
+    const mixIn = smooth(NECK - 0.045, NECK + 0.02, u);
+    if (mixIn > 0) {
+      const ph = hash(r, 9, 2);
+      const xs = c - Math.floor(t * SPEED * (0.35 + 0.75 * ph));
+      const n = noise(xs * 0.42, r * 1.37, t * 0.12) * 0.5 + 0.5;
+      const fadeOut = 1 - smooth(resumeAt - 0.03, resumeAt, u);
+      const density = mixIn * fadeOut * (0.68 - 0.12 * y0 * y0);
+      if (n < density) {
+        const flick = Math.floor(t * 1.6 + hash(xs, r, 3) * 9);
+        const ch = CHAOS[Math.floor(hash(xs, r, flick) * CHAOS.length)];
+        const core = Math.exp(-Math.pow((u - NECK - 0.03) / 0.12, 2));
+        return [ch, clamp(0.38 + 0.4 * hash(xs, r, 4) + 0.3 * core, 0, 1)];
+      }
+      if (u > NECK + 0.02 || hash(c, r, 6) < mixIn) return null;
+    }
+
+    const line = Math.min(rows - 1, Math.floor((y0 + 1) / 2 * rows));
+    return stream(c, line, u, y0, t, ROWS_IN, aspect);
   }
 
   // ---------- rendering ----------
@@ -95,7 +113,7 @@
   function start(canvas) {
     const ctx = canvas.getContext('2d');
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let W = 0, H = 0, cw = 0, lines = 0, half = 0, ringX = 0, ringR = 0, palette = [], raf = 0, last = 0, visible = true;
+    let W = 0, H = 0, cw = 0, rh = 0, cols = 0, rows = 0, palette = [], raf = 0, last = 0, visible = true;
     const t0 = performance.now();
 
     function readTheme() {
@@ -113,86 +131,23 @@
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       readTheme();
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
       cw = ctx.measureText('M').width || FONT_PX * 0.6;
-      const rh = FONT_PX * ROW_GAP;
-      lines = Math.floor(H / rh);           // one stream per row of spacing where the bundle is full height
-      half = (lines * rh) / 2;              // streams span ±half px around the vertical centre
-      ringX = W * RING_U;
-      ringR = Math.min(half * RING_R, W * 0.07) * POCKET; // the streams work against the pocket, not the ring itself
+      rh = FONT_PX * 1.25;
+      cols = Math.floor(W / cw); rows = Math.floor(H / rh);
       draw(performance.now());
     }
-    // Each stream is traced as a curve: glyphs are spaced about one character apart along its length
-    // (not snapped to a row grid), so steep parts stay thin.
     function draw(now) {
       const t = (now - t0) / 1000;
       ctx.clearRect(0, 0, W, H);
-      if (!lines || W < cw * 4) return;
+      if (!cols || !rows) return;
+      const aspect = (rows * rh / 2) / (cols * cw);
       const buckets = palette.map(() => []);
-      const cy = H / 2, R2 = ringR * ringR;
-      // Point of stream k at base position x, pushed out around the ring (r -> sqrt(r^2 + R^2),
-      // so nothing ever enters it), plus a swirling wake shed off its back edge.
-      const pt = (k, x) => {
-        const dx = x - ringX, dy = streamV(k, lines, x / W, t) * half;
-        const sc = Math.sqrt(1 + R2 / (dx * dx + dy * dy + 1e-6));
-        const X = ringX + dx * sc;
-        let Y = cy + dy * sc;
-        const behind = X - ringX;
-        if (behind > 0) {
-          const wake = clamp((behind - ringR * 0.6) / ringR, 0, 1) * Math.exp(-behind / (ringR * 5))
-            * Math.exp(-Math.pow((Y - cy) / (ringR * 1.8), 2));
-          Y += wake * ringR * 0.75 * Math.sin(behind / ringR * 1.8 - t * 2.2 + (Y > cy ? 0 : Math.PI));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const res = cell(c, r, cols, rows, t, aspect);
+          if (res) buckets[Math.min(5, Math.floor(res[1] * 6))].push(res[0], c * cw, r * rh);
         }
-        return [X, Y];
-      };
-      const inRing = (X, Y) => (X - ringX) * (X - ringX) + (Y - cy) * (Y - cy) < R2;
-      // Jammed glyphs snap to a grid of text rows (one row per stream spacing), so the neck, the lobe and
-      // the ring's rim read as packed lines of text; free-flowing streams stay smooth curves.
-      const rh = (half * 2) / lines, top = cy - half;
-      const cols = Math.ceil(W / cw), grid = new Map();
-      const spray = [];
-      for (let k = 0; k < lines; k++) {
-        let x = cw / 2;
-        while (x < W - cw / 2) {
-          const [X, Y] = pt(k, x), a = pt(k, x - 1), b = pt(k, x + 1);
-          const ddx = (b[0] - a[0]) / 2, ddy = (b[1] - a[1]) / 2;
-          const slope = ddy / (Math.abs(ddx) < 1e-3 ? 1e-3 : ddx);
-          const u = x / W, dR = Math.hypot(X - ringX, Y - cy);
-          const wakeZone = X > ringX + ringR * 1.7 && Math.abs(Y - cy) < ringR * 1.6;
-          const jam = !wakeZone && (core(u) > 0.5 || lobe(u) > 0.35 || dR < ringR * 1.6);
-          const g = glyph(k, u, t, slope, jam, dR < ringR * 1.35);
-          if (g && X > cw / 2 && X < W - cw / 2 && Y > FONT_PX / 2 && Y < H - FONT_PX / 2 && !inRing(X, Y)) {
-            if (jam) {
-              const c = Math.round(X / cw - 0.5), r = Math.round((Y - top) / rh - 0.5);
-              const gx = (c + 0.5) * cw, gy = top + (r + 0.5) * rh;
-              if (!inRing(gx, gy) && gy > FONT_PX / 2 && gy < H - FONT_PX / 2) grid.set(r * cols + c, [g[0], gx, gy, g[1]]);
-            } else buckets[Math.min(5, Math.floor(g[1] * 6))].push(g[0], X, Y);
-          }
-          // sparse spray drifting off the lobe
-          const tb = lobe(u);
-          if (tb > 0.3 && hash(Math.floor(x), k, Math.floor(t * 4)) > 0.995 - tb * 0.006) {
-            const sy = Y + (hash(k, Math.floor(x), 9) - 0.5) * half * 0.5;
-            if (!inRing(X, sy)) spray.push('.', X, sy);
-          }
-          x += clamp(cw / Math.hypot(ddx, ddy), 0.02, cw * 1.2) * 1.15;
-        }
-      }
-      grid.forEach((g) => buckets[Math.min(5, Math.floor(g[3] * 6))].push(g[0], g[1], g[2]));
-      buckets[1].push(...spray);
-      // The ring itself: a thin dotted circle of small glyphs inside the pocket, with a dotted tail curling
-      // off its top-right into the flow. Positions and glyphs never change, so it stays put while the flow churns.
-      const rr = ringR / POCKET;
-      const n = Math.max(14, Math.round((2 * Math.PI * rr) / (cw * 1.5)));
-      for (let i = 0; i < n; i++) {
-        if (hash(i, 17, 3) < 0.2) continue; // a few gaps, so it reads as dotted
-        const th = (i / n) * 2 * Math.PI;
-        buckets[4].push(RING_GLYPHS[Math.floor(hash(i, 5, 11) * RING_GLYPHS.length)], ringX + Math.cos(th) * rr, cy + Math.sin(th) * rr);
-      }
-      for (let i = 0, m = Math.round((rr * 5) / (cw * 1.4)); i < m; i++) {
-        if (hash(i, 23, 7) < 0.25) continue;
-        const s = i / m, tx = ringX + rr * (0.75 + s * 5), ty = cy - rr * (0.65 + 1.1 * s - 0.55 * s * s);
-        if (tx < W - cw / 2) buckets[3].push(hash(i, 9, 2) < 0.7 ? '.' : '-', tx, ty);
       }
       buckets.forEach((list, i) => {
         ctx.fillStyle = palette[i];
@@ -223,6 +178,6 @@
     const go = () => document.querySelectorAll('canvas.flow').forEach(start);
     document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go) : go();
   } else {
-    module.exports = { streamV, glyph }; // lets node render a text preview
+    module.exports = { cell }; // lets node render a text preview
   }
 })();
