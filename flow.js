@@ -9,11 +9,13 @@
   const FPS = 30;
 
   // Where things happen, as a fraction of the canvas width.
-  const FUNNEL = 0.24;  // rows start bending inward
-  const NECK = 0.45;    // tightest point
-  const BLOOM = 0.6;    // scramble has fanned back out to full height
-  const RESUME = 0.76;  // rows re-form
-  const NECK_H = 0.14;  // height of the neck, as a fraction of full height
+  const FUNNEL = 0.2;     // rows start bending inward
+  const NECK_IN = 0.4;    // the neck begins: everything is squeezed into one band
+  const NECK_OUT = 0.53;  // the neck ends and the scramble fans out
+  const BLOOM = 0.66;     // scramble has fanned back out to full height
+  const RESUME = 0.79;    // rows re-form
+  const NECK_H = 0.2;     // thickness of the neck, as a fraction of full height
+  const NECK_SPEED = 2;   // how much faster text moves inside the neck
 
   const ROWS_IN = 'oooooooo0-';   // glyphs for the incoming rows (picked per run)
   const ROWS_OUT = '-------o=';   // glyphs for the re-formed rows
@@ -35,14 +37,16 @@
       l(l(h(0, 0, 1), h(1, 0, 1), u), l(h(0, 1, 1), h(1, 1, 1), u), v), w) * 2 - 1;
   }
 
-  // Envelope (1 = full height): a rounded shoulder into the neck, a straight cone out of it.
+  // Envelope (1 = full height): a rounded shoulder in, a straight
+  // channel of constant thickness (the neck), then a straight cone out.
   function envelope(u) {
     if (u <= FUNNEL || u >= BLOOM) return 1;
-    if (u < NECK) {
-      const s = (u - FUNNEL) / (NECK - FUNNEL);
+    if (u < NECK_IN) {
+      const s = (u - FUNNEL) / (NECK_IN - FUNNEL);
       return NECK_H + (1 - NECK_H) * Math.pow(Math.cos(s * Math.PI / 2), 0.75);
     }
-    return NECK_H + (1 - NECK_H) * Math.pow((u - NECK) / (BLOOM - NECK), 0.85);
+    if (u <= NECK_OUT) return NECK_H;
+    return NECK_H + (1 - NECK_H) * Math.pow((u - NECK_OUT) / (BLOOM - NECK_OUT), 0.85);
   }
   const dEnvelope = (u) => (envelope(u + 0.002) - envelope(u - 0.002)) / 0.004;
 
@@ -70,7 +74,7 @@
     const u = (c + 0.5) / cols, v = (r + 0.5) / rows * 2 - 1;
 
     // the cone's edge breathes a little so the bloom never looks ruled
-    const cone = smooth(NECK, NECK + 0.04, u) * (1 - smooth(BLOOM - 0.02, BLOOM + 0.05, u));
+    const cone = smooth(NECK_OUT, NECK_OUT + 0.04, u) * (1 - smooth(BLOOM - 0.02, BLOOM + 0.05, u));
     const w = envelope(u) * (1 + cone * 0.16 * noise(u * 11 - t * 0.35, v * 2.5, t * 0.3));
     const y0 = v / w;
     if (Math.abs(y0) > 1) return null;
@@ -79,20 +83,23 @@
     if (u >= resumeAt) return stream(c, r, u, 0, t, ROWS_OUT, aspect);
 
     // scramble: clumps of glyphs that drift downstream and flicker
-    const mixIn = smooth(NECK - 0.045, NECK + 0.02, u);
+    const mixIn = smooth(NECK_IN - 0.045, NECK_IN + 0.01, u);
     if (mixIn > 0) {
+      // the neck itself: a packed, brighter, faster band that carries a little way into the bloom
+      const band = Math.abs(v) < NECK_H * 1.05
+        ? smooth(NECK_IN - 0.02, NECK_IN + 0.01, u) * (1 - smooth(NECK_OUT, NECK_OUT + 0.07, u)) : 0;
       const ph = hash(r, 9, 2);
-      const xs = c - Math.floor(t * SPEED * (0.35 + 0.75 * ph));
+      const xs = c - Math.floor(t * SPEED * (0.35 + 0.75 * ph) * (band > 0.5 ? NECK_SPEED : 1));
       const n = noise(xs * 0.42, r * 1.37, t * 0.12) * 0.5 + 0.5;
       const fadeOut = 1 - smooth(resumeAt - 0.03, resumeAt, u);
-      const density = mixIn * fadeOut * (0.68 - 0.12 * y0 * y0);
+      let density = mixIn * fadeOut * (0.68 - 0.12 * y0 * y0);
+      density += band * (0.84 - density);
       if (n < density) {
         const flick = Math.floor(t * 1.6 + hash(xs, r, 3) * 9);
         const ch = CHAOS[Math.floor(hash(xs, r, flick) * CHAOS.length)];
-        const core = Math.exp(-Math.pow((u - NECK - 0.03) / 0.12, 2));
-        return [ch, clamp(0.38 + 0.4 * hash(xs, r, 4) + 0.3 * core, 0, 1)];
+        return [ch, clamp(0.38 + 0.4 * hash(xs, r, 4) + 0.35 * band, 0, 1)];
       }
-      if (u > NECK + 0.02 || hash(c, r, 6) < mixIn) return null;
+      if (u > NECK_IN + 0.02 || hash(c, r, 6) < mixIn) return null;
     }
 
     const line = Math.min(rows - 1, Math.floor((y0 + 1) / 2 * rows));
