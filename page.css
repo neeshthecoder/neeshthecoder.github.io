@@ -2,7 +2,7 @@
    Loaded after styles.css. Uses only existing tokens and type-scale sizes. */
 
 /* Page frame: header, then main filling the rest of the viewport. */
-body {
+.frame {
   box-sizing: border-box;
   max-width: 1440px;
   margin-inline: auto;
@@ -260,16 +260,37 @@ body {
   display: none;
 }
 
-/* Desktop and tablet: content on the left, flow animation on the right. */
-@media (min-width: 820px) {
-  /* A definite height lets the canvas's height: 100% resolve against this frame;
-     with only min-height, the canvas's own size feeds back into the rows and the page grows on resize. */
-  body {
-    height: 100vh;
-    height: 100dvh;
+/* Desktop and landscape tablets: one fixed 1600×880 frame, laid out once and scaled evenly
+   to fit the window (--frame-scale is set by the inline script in index.html).
+   Every size inside is fixed, so the composition is identical on any screen; only its scale changes.
+   Portrait tablets and phones keep the single-column layout above, without the animation. */
+@media (min-width: 820px) and (min-aspect-ratio: 5/4) {
+  html, body { height: 100%; overflow: hidden; }
+
+  .frame {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 1600px;
+    height: 880px;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: var(--space-10) 120px;
+    transform: translate(-50%, -50%) scale(var(--frame-scale, 1));
+    transform-origin: center;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
     column-gap: var(--space-10);
   }
+
+  .site-name,
+  .intro__text,
+  .now,
+  .projects .ps-card__body { font-size: 19px; }
+
+  .projects .ps-card__label { font-size: 18px; }
+  .projects .ps-card { width: 220px; min-height: 260px; }
+  .intro { padding-top: 52px; }
 
   .site-name { grid-column: 1; grid-row: 1; }
   .intro { grid-column: 1; grid-row: 2; }

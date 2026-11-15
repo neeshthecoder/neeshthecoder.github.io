@@ -132,9 +132,11 @@
       ctx.font = `${FONT_PX}px ${mono}`;
     }
     function resize() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const r = canvas.getBoundingClientRect();
-      W = r.width; H = r.height;
+      // W/H are layout pixels inside the fixed frame; the frame is CSS-scaled to the window,
+      // so the bitmap is sized to the on-screen size (k) to stay sharp at any scale.
+      W = canvas.offsetWidth; H = canvas.offsetHeight;
+      const k = W ? canvas.getBoundingClientRect().width / W : 1;
+      const dpr = Math.min((window.devicePixelRatio || 1) * k, 3);
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       readTheme();
@@ -173,6 +175,7 @@
     }
 
     new ResizeObserver(resize).observe(canvas);
+    window.addEventListener('resize', resize); // frame scale changes don't change the canvas's layout size
     new IntersectionObserver((e) => { visible = e[0].isIntersecting; run(); }).observe(canvas);
     document.addEventListener('visibilitychange', run);
     reduce.addEventListener('change', run);

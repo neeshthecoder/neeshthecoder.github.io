@@ -8,11 +8,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="styles.css?v=4">
-  <link rel="stylesheet" href="page.css?v=8">
+  <link rel="stylesheet" href="page.css?v=9">
+  <script>
+    // Desktop/tablet: the page is one fixed 1600×880 frame, scaled evenly to fit the window (see page.css).
+    (function () {
+      function fit() {
+        var s = Math.min(innerWidth / 1600, innerHeight / 880);
+        document.documentElement.style.setProperty('--frame-scale', s);
+      }
+      fit();
+      addEventListener('resize', fit);
+    })();
+  </script>
   <script src="scramble.js?v=4" defer></script>
   <script src="now.js?v=1" defer></script>
 </head>
 <body>
+<div class="frame">
   <header class="site-name">
     <h1 class="display site-name__text" data-scramble>Avaneesh Babu</h1>
   </header>
@@ -67,6 +79,7 @@
   </main>
 
   <canvas class="flow" aria-hidden="true"></canvas>
-  <script src="flow.js" defer></script>
+  <script src="flow.js?v=2" defer></script>
+</div>
 </body>
 </html>
