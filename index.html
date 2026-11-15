@@ -8,8 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="styles.css?v=4">
-  <link rel="stylesheet" href="page.css?v=6">
+  <link rel="stylesheet" href="page.css?v=7">
   <script src="scramble.js?v=4" defer></script>
+  <script src="now.js?v=1" defer></script>
 </head>
 <body>
   <header class="site-name">
@@ -17,7 +18,41 @@
   </header>
 
   <main class="intro">
-    <p class="body-lg intro__text">Hey, I’m Avaneesh. Started a company called Neuro Safety Systems, am an O’Shaughnessy Fellow, attained a Chemical Engineering B.S. at Johns Hopkins University, and am always looking to improve systems of consequence. I love to break things and artistically steal. This site is my testament to that.</p>
+    <div class="intro__top">
+      <p class="body-lg intro__text">Hey, I’m Avaneesh. Started a company called Neuro Safety Systems, am an O’Shaughnessy Fellow, attained a Chemical Engineering B.S. at Johns Hopkins University, and am always looking to improve systems of consequence. I love to break things and artistically steal. This site is my testament to that.</p>
+
+      <ul class="now" aria-label="Currently">
+        <li class="now__item">
+          <img class="now__art now__art--book" src="Notes%20on%20Startups.jpg" alt="Cover of Zero to One by Peter Thiel" width="863" height="1000">
+          <div class="now__text">
+            <p class="now__label">Reading</p>
+            <p class="now__title"><cite>Zero to One: Notes on Startups</cite> by Peter Thiel</p>
+            <p class="now__meta">Crown Business · 2014</p>
+          </div>
+        </li>
+        <li class="now__item" data-player>
+          <button class="now__art now__disc" type="button" aria-label="Play “Last Call”" aria-pressed="false">
+            <img src="Last%20Call.png" alt="" width="503" height="496">
+          </button>
+          <div class="now__text">
+            <p class="now__label">Listening to</p>
+            <p class="now__title">“Last Call” by Kanye West</p>
+            <p class="now__meta">
+              <button class="now__play" type="button" aria-label="Play “Last Call”" aria-pressed="false">
+                <svg class="now__icon-play" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3.5 2.2v7.6L9.6 6z" stroke-linejoin="round"/></svg>
+                <svg class="now__icon-pause" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 2.5v7M8 2.5v7"/></svg>
+              </button>
+              <span class="now__time">The College Dropout · 2004</span>
+            </p>
+          </div>
+          <audio src="Last%20Call.mp3" preload="none"></audio>
+        </li>
+      </ul>
+
+      <p class="elsewhere">
+        <a class="elsewhere__link" href="https://www.linkedin.com/in/avaneeshb/" target="_blank" rel="noopener">LinkedIn<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l6-6M4 3h5v5"/></svg></a>
+      </p>
+    </div>
 
     <section class="projects" aria-label="Projects">
       <article class="ps-card ps-card--sm">
